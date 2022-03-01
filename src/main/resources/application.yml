@@ -1,0 +1,58 @@
+spring:
+  application:
+    name: GATEWAY-SERVICE
+  cloud:
+    gateway:
+      routes:
+        - id: savings-service-a
+          uri: ${SAVINGS-SERVICE-A:http://172.17.0.4:8081}
+          predicates:
+            - Path=/savings/a/**
+          filters:
+            - name: Retry
+              args:
+                retries: 3
+                methods: GET
+                backoff:
+                  firstBacoff: 50ms
+                  maxBackoff: 200ms
+            - name: CircuitBreaker
+              args:
+                name: savings-service-a
+                fallbackUri: forward:/savings-fallback
+        - id: savings-service-b
+          uri: ${SAVINGS-SERVICE-A:http://172.17.0.5:8082}
+          predicates:
+            - Path=/savings/b/**
+          filters:
+            - name: Retry
+              args:
+                retries: 3
+                methods: GET
+                backoff:
+                  firstBacoff: 50ms
+                  maxBackoff: 200ms
+            - name: CircuitBreaker
+              args:
+                name: savings-service-b
+                fallbackUri: forward:/savings-fallback
+      httpclient:
+        connect-timeout: 1000
+        response-timeout: 5s
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      savingsService:
+        slidingWindowSize: 10
+        permittedNumberOfCallsInHalfOpenState: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10000
+        registerHealthIndicator: true
+  timelimiter:
+    instances:
+      savingsService:
+        timeoutDuration: 2s
+
+server:
+  port: 8080
